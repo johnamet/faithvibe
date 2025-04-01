@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Calendar, Clock, MapPin } from "lucide-react"
@@ -8,44 +8,29 @@ import { motion } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import Image from "next/image"
-
-// This would be fetched from Firebase in a real implementation
-const events = [
-  {
-    id: "1",
-    title: "Summer Spiritual Retreat",
-    date: "June 15-18, 2025",
-    time: "All Day",
-    location: "Mountain View Retreat Center",
-    image: "/placeholder.svg?height=400&width=600",
-    category: "Retreat",
-    registrationOpen: true,
-  },
-  {
-    id: "2",
-    title: "Youth Camp Registration",
-    date: "July 10-15, 2025",
-    time: "All Day",
-    location: "Lakeside Camp Grounds",
-    image: "/placeholder.svg?height=400&width=600",
-    category: "Camp",
-    registrationOpen: true,
-    featured: true,
-  },
-  {
-    id: "3",
-    title: "Community Service Day",
-    date: "May 8, 2025",
-    time: "9:00 AM - 3:00 PM",
-    location: "Downtown Community Center",
-    image: "/placeholder.svg?height=400&width=600",
-    category: "Service",
-    registrationOpen: true,
-  },
-]
+import { Event, getUpcomingEvents } from "@/services/event-service" // Adjust path
 
 export default function UpcomingEvents() {
+  const [events, setEvents] = useState<Event[]>([])
   const [hoveredEvent, setHoveredEvent] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const data = await getUpcomingEvents(3) // Limit to 3 events
+        setEvents(data)
+      } catch (error) {
+        console.error("Error fetching upcoming events:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchEvents()
+  }, [])
+
+  if (loading) return <p>Loading events...</p>
+  if (!events.length) return <p>No upcoming events available.</p>
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -69,7 +54,7 @@ export default function UpcomingEvents() {
               )}
               <div className="overflow-hidden h-48 relative">
                 <Image
-                  src={event.image || "/placeholder.svg"}
+                  src={event.image || "/placeholder.svg?height=400&width=600"}
                   alt={event.title}
                   fill
                   className={`object-cover transition-transform duration-500 ${
@@ -110,4 +95,3 @@ export default function UpcomingEvents() {
     </div>
   )
 }
-

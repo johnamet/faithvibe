@@ -1,50 +1,76 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Bookmark, Heart, MessageSquare, Share2 } from "lucide-react"
 import { motion } from "framer-motion"
 import Link from "next/link"
-
-// This would be fetched from Firebase in a real implementation
-const devotional = {
-  id: "1",
-  title: "Finding Peace in Troubled Times",
-  verse: "John 14:27",
-  verseText:
-    "Peace I leave with you; my peace I give you. I do not give to you as the world gives. Do not let your hearts be troubled and do not be afraid.",
-  content:
-    "In a world filled with uncertainty and challenges, the promise of peace from Jesus stands as an anchor for our souls. This peace is not dependent on external circumstances but flows from a deep connection with God. When we align our hearts with His truth and presence, we can experience tranquility even amid life's storms. Today, take a moment to quiet your mind, release your worries to God, and receive the peace that surpasses all understanding.",
-  author: {
-    name: "Pastor David Johnson",
-    image: "/placeholder-user.jpg",
-  },
-  date: "April 1, 2025",
-  likes: 124,
-  comments: 18,
-}
+import { getLatestDevotional, likeDevotional } from "@/services/devotional-service" // Adjust path
+// Assume a bookmark function exists or create one
+import { addBookmark, removeBookmark, getUserBookmarks } from "@/services/bookmark-service" // Hypothetical
 
 export default function DevotionalPreview() {
+  const [devotional, setDevotional] = useState(null)
   const [liked, setLiked] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
-  const [likeCount, setLikeCount] = useState(devotional.likes)
+  const [likeCount, setLikeCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const userId = "current-user-id" // Replace with actual user ID from auth
 
-  const handleLike = () => {
-    if (liked) {
-      setLikeCount((prev) => prev - 1)
-    } else {
-      setLikeCount((prev) => prev + 1)
+  useEffect(() => {
+    const fetchDevotional = async () => {
+      try {
+        const data = await getLatestDevotional()
+        if (data) {
+          setDevotional(data)
+          setLikeCount(data.likes || 0)
+
+          // Check if user has bookmarked this devotional (hypothetical)
+          const bookmarks = await getUserBookmarks(userId)
+          setBookmarked(bookmarks?.includes(data.id))
+        }
+      } catch (error) {
+        console.error("Error fetching latest devotional:", error)
+      } finally {
+        setLoading(false)
+      }
     }
-    setLiked(!liked)
-    // In a real implementation, this would update Firebase
+    fetchDevotional()
+  }, [userId])
+
+  const handleLike = async () => {
+    if (!devotional) return
+    try {
+      if (!liked) {
+        await likeDevotional(devotional.id)
+        setLikeCount((prev) => prev + 1)
+        setLiked(true)
+      }
+      // Note: No unlike functionality in current Firebase setup; add if needed
+    } catch (error) {
+      console.error("Error liking devotional:", error)
+    }
   }
 
-  const handleBookmark = () => {
-    setBookmarked(!bookmarked)
-    // In a real implementation, this would update Firebase
+  const handleBookmark = async () => {
+    if (!devotional) return
+    try {
+      if (bookmarked) {
+        await removeBookmark(userId, devotional.id)
+        setBookmarked(false)
+      } else {
+        await addBookmark(userId, devotional.id)
+        setBookmarked(true)
+      }
+    } catch (error) {
+      console.error("Error toggling bookmark:", error)
+    }
   }
+
+  if (loading) return <p>Loading devotional...</p>
+  if (!devotional) return <p>No devotional available.</p>
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
@@ -52,7 +78,7 @@ export default function DevotionalPreview() {
         <CardHeader className="bg-gradient-to-r from-amber-50 to-white pb-4">
           <div className="flex items-center gap-3 mb-3">
             <Avatar>
-              <AvatarImage src={devotional.author.image} alt={devotional.author.name} />
+              <AvatarImage src={devotional.author.image || "/placeholder-user.jpg"} alt={devotional.author.name} />
               <AvatarFallback>
                 {devotional.author.name
                   .split(" ")
@@ -62,7 +88,9 @@ export default function DevotionalPreview() {
             </Avatar>
             <div>
               <p className="font-medium text-sm">{devotional.author.name}</p>
-              <p className="text-xs text-muted-foreground">{devotional.date}</p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(devotional.date.toDate()).toLocaleDateString()}
+              </p>
             </div>
           </div>
           <CardTitle className="text-xl md:text-2xl text-primary">{devotional.title}</CardTitle>
@@ -88,7 +116,7 @@ export default function DevotionalPreview() {
             <Button variant="ghost" size="sm" className="flex items-center gap-1 text-muted-foreground" asChild>
               <Link href={`/devotionals/${devotional.id}#comments`}>
                 <MessageSquare className="h-4 w-4" />
-                <span>{devotional.comments}</span>
+                <span>{devotional.comments || 0}</span>
               </Link>
             </Button>
           </div>
@@ -105,4 +133,3 @@ export default function DevotionalPreview() {
     </motion.div>
   )
 }
-

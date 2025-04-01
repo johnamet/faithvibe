@@ -3,48 +3,59 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { motion, useAnimation } from "framer-motion"
-
-// This would be fetched from Firebase in a real implementation
-const donationGoal = {
-  current: 15750,
-  target: 25000,
-  donors: 124,
-  title: "Building Fund Campaign",
-  description: "Help us reach our goal to expand our facilities and better serve our community.",
-}
+import { getDonationProgress } from "@/services/donation-service" // Adjust path
 
 export default function DonationProgress() {
-  const [progress, setProgress] = useState(0)
+  const [donationData, setDonationData] = useState({ current: 0, target: 25000, donors: 0, title: "", description: "" })
+  const [loading, setLoading] = useState(true)
   const controls = useAnimation()
 
-  const percentage = Math.round((donationGoal.current / donationGoal.target) * 100)
+  useEffect(() => {
+    const fetchProgress = async () => {
+      try {
+        const data = await getDonationProgress()
+        setDonationData({
+          current: data.current,
+          target: data.goal,
+          donors: data.donors || 0, // Optional field
+          title: "Building Fund Campaign", // Hardcoded or fetch from Firebase
+          description: "Help us reach our goal to expand our facilities and better serve our community.",
+        })
+      } catch (error) {
+        console.error("Error fetching donation progress:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProgress()
+  }, [])
+
+  const percentage = Math.round((donationData.current / donationData.target) * 100)
 
   useEffect(() => {
-    controls.start({
-      width: `${percentage}%`,
-      transition: { duration: 1.5, ease: "easeOut" },
-    })
+    if (!loading) {
+      controls.start({
+        width: `${percentage}%`,
+        transition: { duration: 1.5, ease: "easeOut" },
+      })
+    }
+  }, [percentage, controls, loading])
 
-    const timer = setTimeout(() => {
-      setProgress(percentage)
-    }, 500)
-
-    return () => clearTimeout(timer)
-  }, [percentage, controls])
+  if (loading) return <p>Loading donation progress...</p>
 
   return (
     <Card className="border-amber-100 overflow-hidden max-w-3xl mx-auto">
       <CardContent className="pt-6">
         <div className="text-center mb-6">
-          <h3 className="text-xl font-bold text-primary mb-2">{donationGoal.title}</h3>
-          <p className="text-muted-foreground">{donationGoal.description}</p>
+          <h3 className="text-xl font-bold text-primary mb-2">{donationData.title}</h3>
+          <p className="text-muted-foreground">{donationData.description}</p>
         </div>
 
         <div className="space-y-6">
           <div className="flex justify-between items-end mb-2">
             <div>
-              <span className="text-3xl font-bold text-primary">${donationGoal.current.toLocaleString()}</span>
-              <span className="text-muted-foreground"> raised of ${donationGoal.target.toLocaleString()}</span>
+              <span className="text-3xl font-bold text-primary">${donationData.current.toLocaleString()}</span>
+              <span className="text-muted-foreground"> raised of ${donationData.target.toLocaleString()}</span>
             </div>
             <div className="text-right">
               <span className="text-lg font-medium">{percentage}%</span>
@@ -61,10 +72,13 @@ export default function DonationProgress() {
 
           <div className="flex justify-between text-sm text-muted-foreground">
             <div>
-              <span className="font-medium text-primary">{donationGoal.donors}</span> Donors
+              <span className="font-medium text-primary">{donationData.donors}</span> Donors
             </div>
             <div>
-              <span className="font-medium text-primary">${donationGoal.target - donationGoal.current}</span> to go
+              <span className="font-medium text-primary">
+                ${(donationData.target - donationData.current).toLocaleString()}
+              </span>{" "}
+              to go
             </div>
           </div>
         </div>
@@ -72,4 +86,3 @@ export default function DonationProgress() {
     </Card>
   )
 }
-

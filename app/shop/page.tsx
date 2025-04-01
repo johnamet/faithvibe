@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,87 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Slider } from "@/components/ui/slider"
-
-// This would be fetched from Firebase in a real implementation
-const products = [
-  {
-    id: "1",
-    name: "Daily Devotional Journal",
-    price: 24.99,
-    image: "/placeholder.svg?height=400&width=400",
-    category: "Books",
-    description:
-      "A beautifully designed journal with daily scripture readings, reflection prompts, and space for personal thoughts.",
-  },
-  {
-    id: "2",
-    name: "Handcrafted Wooden Cross",
-    price: 39.99,
-    image: "/placeholder.svg?height=400&width=400",
-    category: "Decor",
-    sale: true,
-    originalPrice: 49.99,
-    description: "Beautifully handcrafted wooden cross made from reclaimed oak, perfect for wall hanging or display.",
-  },
-  {
-    id: "3",
-    name: "Premium Prayer Beads",
-    price: 18.5,
-    image: "/placeholder.svg?height=400&width=400",
-    category: "Accessories",
-    description: "Handmade prayer beads crafted from natural stone and wood, designed to enhance your prayer practice.",
-  },
-  {
-    id: "4",
-    name: "Inspirational Wall Art",
-    price: 32.99,
-    image: "/placeholder.svg?height=400&width=400",
-    category: "Decor",
-    description: "Beautiful canvas print featuring scripture verses with modern calligraphy and elegant design.",
-  },
-  {
-    id: "5",
-    name: "Scripture Memory Cards",
-    price: 12.99,
-    image: "/placeholder.svg?height=400&width=400",
-    category: "Books",
-    description: "Set of 52 beautifully designed cards featuring key scripture verses for memorization and meditation.",
-  },
-  {
-    id: "6",
-    name: "Worship Music Collection",
-    price: 15.99,
-    image: "/placeholder.svg?height=400&width=400",
-    category: "Music",
-    description: "Digital collection of original worship songs performed by our church worship team.",
-  },
-  {
-    id: "7",
-    name: "Faith Community T-Shirt",
-    price: 22.5,
-    image: "/placeholder.svg?height=400&width=400",
-    category: "Apparel",
-    sale: true,
-    originalPrice: 28.99,
-    description: "Comfortable cotton t-shirt featuring our church logo and inspirational message on the back.",
-  },
-  {
-    id: "8",
-    name: "Children's Bible Stories",
-    price: 19.99,
-    image: "/placeholder.svg?height=400&width=400",
-    category: "Books",
-    description: "Illustrated collection of Bible stories written specifically for children ages 4-8.",
-  },
-  {
-    id: "9",
-    name: "Leather Bible Cover",
-    price: 45.0,
-    image: "/placeholder.svg?height=400&width=400",
-    category: "Accessories",
-    description: "Premium leather Bible cover with zipper closure, pen holder, and extra pockets for notes.",
-  },
-]
+import { getAllProducts, getProductsByCategory } from "@/services/product-service" // Adjust path
 
 const categories = ["All", "Books", "Decor", "Accessories", "Apparel", "Music"]
 
@@ -102,15 +22,35 @@ export default function ShopPage() {
   const [priceRange, setPriceRange] = useState([0, 50])
   const [sortBy, setSortBy] = useState("featured")
   const [hoveredProduct, setHoveredProduct] = useState<string | null>(null)
-  const [filteredProducts, setFilteredProducts] = useState(products)
+  const [products, setProducts] = useState<Product[]>([]) // State for fetched products
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true) // Loading state
+
+  // Fetch products from Firebase on mount and when activeTab changes
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true)
+        let data = []
+        if (activeTab.toLowerCase() === "all") {
+          data = await getAllProducts() // Fetch all products
+        } else {
+          data = await getProductsByCategory(activeTab) // Fetch by category
+        }
+        setProducts(data)
+        setFilteredProducts(data) // Initially set filtered to all fetched data
+      } catch (error) {
+        console.error("Error fetching products:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProducts()
+  }, [activeTab])
 
   const handleFilter = () => {
-    let filtered = products
-
-    // Filter by category
-    if (activeTab.toLowerCase() !== "all") {
-      filtered = filtered.filter((product) => product.category.toLowerCase() === activeTab.toLowerCase())
-    }
+    let filtered = [...products]
 
     // Filter by search query
     if (searchQuery) {
@@ -118,7 +58,7 @@ export default function ShopPage() {
         (product) =>
           product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          product.category.toLowerCase().includes(searchQuery.toLowerCase()),
+          product.category.toLowerCase().includes(searchQuery.toLowerCase())
       )
     }
 
@@ -133,9 +73,17 @@ export default function ShopPage() {
     } else if (sortBy === "name") {
       filtered.sort((a, b) => a.name.localeCompare(b.name))
     }
-    // For "featured" we don't sort as it's the default order
+    // For "featured" we rely on the default order from Firebase (createdAt desc)
 
     setFilteredProducts(filtered)
+  }
+
+  if (loading) {
+    return (
+      <div className="container px-4 py-12 md:py-16 text-center">
+        <p>Loading products...</p>
+      </div>
+    )
   }
 
   return (
@@ -230,7 +178,7 @@ export default function ShopPage() {
                   )}
                   <div className="overflow-hidden rounded-lg aspect-square relative">
                     <Image
-                      src={product.image || "/placeholder.svg"}
+                      src={product.image || "/placeholder.svg?height=400&width=400"}
                       alt={product.name}
                       fill
                       className={`object-cover transition-transform duration-500 ${
@@ -244,9 +192,9 @@ export default function ShopPage() {
                   <h3 className="font-medium text-primary mb-1 line-clamp-2">{product.name}</h3>
                   <div className="flex items-center gap-2 mb-2">
                     <span className="font-bold">${product.price.toFixed(2)}</span>
-                    {product.sale && (
+                    {product.sale && product.originalPrice && (
                       <span className="text-muted-foreground line-through text-sm">
-                        ${product.originalPrice?.toFixed(2)}
+                        ${product.originalPrice.toFixed(2)}
                       </span>
                     )}
                   </div>
@@ -280,3 +228,18 @@ export default function ShopPage() {
   )
 }
 
+// Define the Product interface within the file for clarity
+interface Product {
+  id?: string
+  name: string
+  price: number
+  originalPrice?: number
+  image: string
+  category: string
+  description: string
+  sale?: boolean
+  featured?: boolean
+  stock?: number
+  createdAt?: any
+  updatedAt?: any
+}

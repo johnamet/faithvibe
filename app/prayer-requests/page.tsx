@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,47 +12,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Heart, Send } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-
-// This would be fetched from Firebase in a real implementation
-const prayerRequests = [
-  {
-    id: "1",
-    name: "Anonymous",
-    request:
-      "Please pray for my mother who is undergoing surgery next week. Pray for the doctors and for a successful recovery.",
-    date: "April 1, 2025",
-    prayerCount: 24,
-    isAnonymous: true,
-  },
-  {
-    id: "2",
-    name: "Sarah Johnson",
-    request:
-      "I'm facing a difficult decision regarding my career. Please pray for wisdom and clarity as I seek God's direction.",
-    date: "March 30, 2025",
-    prayerCount: 18,
-    isAnonymous: false,
-    avatar: "/placeholder-user.jpg",
-  },
-  {
-    id: "3",
-    name: "Michael Chen",
-    request:
-      "Our family is going through financial challenges. Please pray for provision and guidance as we navigate this season.",
-    date: "March 28, 2025",
-    prayerCount: 32,
-    isAnonymous: false,
-    avatar: "/placeholder-user.jpg",
-  },
-  {
-    id: "4",
-    name: "Anonymous",
-    request: "Please pray for healing from chronic pain that I've been experiencing for several months.",
-    date: "March 25, 2025",
-    prayerCount: 41,
-    isAnonymous: true,
-  },
-]
+import { getAllPrayerRequests, createPrayerRequest, prayForRequest } from "@/services/prayer-service" // Adjust path
 
 export default function PrayerRequestsPage() {
   const [name, setName] = useState("")
@@ -62,34 +21,87 @@ export default function PrayerRequestsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [prayedFor, setPrayedFor] = useState<string[]>([])
+  const [prayerRequests, setPrayerRequests] = useState<PrayerRequest[]>([]) // State for fetched requests
+  const [loading, setLoading] = useState(true) // Loading state
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch prayer requests from Firebase on mount
+  useEffect(() => {
+    const fetchPrayerRequests = async () => {
+      try {
+        setLoading(true)
+        const data = await getAllPrayerRequests() // Fetch active prayer requests
+        setPrayerRequests(data)
+      } catch (error) {
+        console.error("Error fetching prayer requests:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPrayerRequests()
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
-    // Simulate API call to Firebase
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      // Create new prayer request in Firebase
+      await createPrayerRequest({
+        name: isAnonymous ? "Anonymous" : name,
+        request,
+        isAnonymous,
+        userId: "current-user-id", // Replace with actual user ID from auth
+      })
+
+      // Fetch updated list of prayer requests
+      const updatedRequests = await getAllPrayerRequests()
+      setPrayerRequests(updatedRequests)
+
       setIsSubmitted(true)
       setName("")
       setRequest("")
       setIsAnonymous(false)
 
       // Reset success message after 5 seconds
-      setTimeout(() => {
-        setIsSubmitted(false)
-      }, 5000)
-    }, 1500)
+      setTimeout(() => setIsSubmitted(false), 5000)
+    } catch (error) {
+      console.error("Error submitting prayer request:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handlePrayClick = (id: string) => {
-    if (prayedFor.includes(id)) {
-      setPrayedFor(prayedFor.filter((item) => item !== id))
-    } else {
-      setPrayedFor([...prayedFor, id])
-    }
+  const handlePrayClick = async (id: string) => {
+    const hasPrayed = prayedFor.includes(id)
 
-    // In a real implementation, this would update Firebase
+    try {
+      if (!hasPrayed) {
+        // Update prayer count in Firebase
+        await prayForRequest(id)
+
+        // Update local state
+        setPrayerRequests((prev) =>
+          prev.map((req) =>
+            req.id === id ? { ...req, prayerCount: (req.prayerCount || 0) + 1 } : req
+          )
+        )
+        setPrayedFor([...prayedFor, id])
+      } else {
+        // Optional: If you want to allow "unpraying", you'd need a corresponding Firebase function
+        setPrayedFor(prayedFor.filter((item) => item !== id))
+      }
+    } catch (error) {
+      console.error("Error updating prayer count:", error)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="container px-4 py-12 md:py-16 text-center">
+        <p>Loading prayer requests...</p>
+      </div>
+    )
   }
 
   return (
@@ -199,60 +211,66 @@ export default function PrayerRequestsPage() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="community" className="space-y-4">
-              {prayerRequests.map((item, index) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.1 }}
-                >
-                  <Card className="border-amber-100">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          {item.isAnonymous ? (
-                            <AvatarFallback>A</AvatarFallback>
-                          ) : (
-                            <>
-                              <AvatarImage src={item.avatar} alt={item.name} />
-                              <AvatarFallback>
-                                {item.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </>
-                          )}
-                        </Avatar>
-                        <div>
-                          <CardTitle className="text-base">{item.name}</CardTitle>
-                          <CardDescription>{item.date}</CardDescription>
+              {prayerRequests.length > 0 ? (
+                prayerRequests.map((item, index) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.1 }}
+                  >
+                    <Card className="border-amber-100">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            {item.isAnonymous ? (
+                              <AvatarFallback>A</AvatarFallback>
+                            ) : (
+                              <>
+                                <AvatarImage src={item.avatar || "/placeholder-user.jpg"} alt={item.name} />
+                                <AvatarFallback>
+                                  {item.name
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </>
+                            )}
+                          </Avatar>
+                          <div>
+                            <CardTitle className="text-base">{item.name}</CardTitle>
+                            <CardDescription>
+                              {item.date ? new Date(item.date.toDate()).toLocaleDateString() : "N/A"}
+                            </CardDescription>
+                          </div>
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pb-2">
-                      <p className="text-muted-foreground">{item.request}</p>
-                    </CardContent>
-                    <CardFooter>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="flex items-center gap-1 text-muted-foreground"
-                        onClick={() => handlePrayClick(item.id)}
-                      >
-                        <Heart
-                          className={`h-4 w-4 ${prayedFor.includes(item.id) ? "fill-red-500 text-red-500" : ""}`}
-                        />
-                        <span>
-                          {prayedFor.includes(item.id)
-                            ? `You and ${item.prayerCount} others prayed`
-                            : `${item.prayerCount} people prayed`}
-                        </span>
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                </motion.div>
-              ))}
+                      </CardHeader>
+                      <CardContent className="pb-2">
+                        <p className="text-muted-foreground">{item.request}</p>
+                      </CardContent>
+                      <CardFooter>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex items-center gap-1 text-muted-foreground"
+                          onClick={() => handlePrayClick(item.id!)}
+                        >
+                          <Heart
+                            className={`h-4 w-4 ${prayedFor.includes(item.id!) ? "fill-red-500 text-red-500" : ""}`}
+                          />
+                          <span>
+                            {prayedFor.includes(item.id!)
+                              ? `You and ${item.prayerCount} others prayed`
+                              : `${item.prayerCount || 0} people prayed`}
+                          </span>
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  </motion.div>
+                ))
+              ) : (
+                <p className="text-muted-foreground text-center">No active prayer requests at this time.</p>
+              )}
             </TabsContent>
             <TabsContent value="resources">
               <Card className="border-amber-100">
@@ -294,3 +312,15 @@ export default function PrayerRequestsPage() {
   )
 }
 
+// Define the PrayerRequest interface within the file for clarity
+interface PrayerRequest {
+  id?: string
+  name: string
+  request: string
+  date?: any
+  prayerCount?: number
+  isAnonymous: boolean
+  userId?: string
+  avatar?: string
+  status?: "active" | "archived"
+}

@@ -1,3 +1,6 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Calendar, Heart, ShoppingBag, User } from "lucide-react"
@@ -8,6 +11,30 @@ import UpcomingEvents from "@/components/upcoming-events"
 import DonationProgress from "@/components/donation-progress"
 
 export default function Home() {
+  const [loading, setLoading] = useState(true)
+
+  // Simulate initial data fetch (could be moved to individual components)
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        // Here you could prefetch data if needed, but we'll let components handle their own fetching
+        setLoading(false)
+      } catch (error) {
+        console.error("Error loading homepage data:", error)
+        setLoading(false)
+      }
+    }
+    fetchInitialData()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen justify-center items-center">
+        <p>Loading...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
       <HeroSection />
@@ -156,4 +183,3 @@ export default function Home() {
     </div>
   )
 }
-
