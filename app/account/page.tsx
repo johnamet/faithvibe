@@ -1,18 +1,43 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useAuth } from "@/hooks/use-auth"
-import { BookOpen, Calendar, Heart, Settings, ShoppingBag } from "lucide-react"
-import Link from "next/link"
-import ProtectedRoute from "@/components/protected-route"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/hooks/use-auth";
+import { BookOpen, Calendar, Heart, Settings, ShoppingBag } from "lucide-react";
+import Link from "next/link";
+import ProtectedRoute from "@/components/protected-route";
+
+// Optional: Force dynamic rendering to skip prerendering
+export const dynamic = "force-dynamic";
 
 export default function AccountPage() {
-  const { user } = useAuth()
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Simulate auth state loading
+  useEffect(() => {
+    if (user !== null) {
+      setIsLoading(false);
+    }
+  }, [user]);
 
   console.log(user);
+
+  if (isLoading) {
+    return (
+      <div className="container px-4 py-12 md:py-16 flex justify-center items-center">
+        <p className="text-muted-foreground">Loading your account...</p>
+      </div>
+    );
+  }
+
+  // If user is still null after loading, redirect or show an error (handled by ProtectedRoute)
+  if (!user) {
+    return null; // ProtectedRoute should handle redirection
+  }
 
   return (
     <ProtectedRoute>
@@ -35,11 +60,11 @@ export default function AccountPage() {
                       {user.displayName
                         ?.split(" ")
                         .map((n) => n[0])
-                        .join("") || user.email?.charAt(0).toUpperCase()}
+                        .join("") || user.email?.charAt(0).toUpperCase() || "U"}
                     </AvatarFallback>
                   </Avatar>
                   <CardTitle className="text-xl">{user.displayName || "Welcome"}</CardTitle>
-                  <CardDescription>{user.email}</CardDescription>
+                  <CardDescription>{user.email || "No email set"}</CardDescription>
                 </div>
               </CardHeader>
               <CardContent>
@@ -74,6 +99,7 @@ export default function AccountPage() {
                     <div className="flex flex-col items-center p-4 bg-amber-50 rounded-lg">
                       <BookOpen className="h-8 w-8 text-primary mb-2" />
                       <span className="text-2xl font-bold">7</span>
+
                       <span className="text-sm text-muted-foreground">Saved</span>
                     </div>
                     <div className="flex flex-col items-center p-4 bg-amber-50 rounded-lg">
@@ -374,7 +400,7 @@ export default function AccountPage() {
                         </div>
                         <div>
                           <label className="text-sm font-medium">Email</label>
-                          <p className="text-muted-foreground">{user.email}</p>
+                          <p className="text-muted-foreground">{user.email || "Not set"}</p>
                         </div>
                       </div>
                       <Button variant="outline" size="sm" className="mt-2 border-amber-200">
@@ -446,6 +472,5 @@ export default function AccountPage() {
         </div>
       </div>
     </ProtectedRoute>
-  )
+  );
 }
-
