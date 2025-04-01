@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { motion, useAnimation } from "framer-motion"
-import { getDonationProgress } from "@/services/donation-service" // Adjust path
+import { getDonationProgress } from "../services/donation-service" // Adjust path
 
 export default function DonationProgress() {
   const [donationData, setDonationData] = useState({ current: 0, target: 25000, donors: 0, title: "", description: "" })

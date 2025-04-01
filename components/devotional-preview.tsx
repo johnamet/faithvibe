@@ -7,17 +7,19 @@ import { Button } from "@/components/ui/button"
 import { Bookmark, Heart, MessageSquare, Share2 } from "lucide-react"
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { getLatestDevotional, likeDevotional } from "@/services/devotional-service" // Adjust path
+import { Devotional, getLatestDevotional, likeDevotional } from "@/services/devotional-service" // Adjust path
 // Assume a bookmark function exists or create one
 import { addBookmark, removeBookmark, getUserBookmarks } from "@/services/bookmark-service" // Hypothetical
+import {getAuth} from "firebase/auth"
 
 export default function DevotionalPreview() {
-  const [devotional, setDevotional] = useState(null)
+  const [devotional, setDevotional] = useState<Devotional|null>(null)
   const [liked, setLiked] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
   const [likeCount, setLikeCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const userId = "current-user-id" // Replace with actual user ID from auth
+  const auth = getAuth()
+  const userId = auth.currentUser?.uid || "guest"
 
   useEffect(() => {
     const fetchDevotional = async () => {
