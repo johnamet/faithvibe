@@ -1,0 +1,107 @@
+// Firestore rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Only admins can read/write to users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+    }
+    
+    // Events collection
+    match /events/{eventId} {
+      // Anyone can read events
+      allow read: if true;
+      // Only admins can create, update, delete
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Products collection
+    match /products/{productId} {
+      // Anyone can read products
+      allow read: if true;
+      // Only admins can create, update, delete
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Event registrations
+    match /eventRegistrations/{registrationId} {
+      // Users can read their own registrations
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Admins can read all registrations
+      allow read: if isAdmin();
+      // Users can create registrations for themselves
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // Only admins can update or delete registrations
+      allow update, delete: if isAdmin();
+    }
+    
+    // Orders
+    match /orders/{orderId} {
+      // Users can read their own orders
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Admins can read all orders
+      allow read: if isAdmin();
+      // Users can create orders for themselves
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // Only admins can update orders
+      allow update: if isAdmin();
+      // Nobody can delete orders
+      allow delete: if false;
+    }
+    
+    // Settings
+    match /settings/{settingId} {
+      // Anyone can read settings
+      allow read: if true;
+      // Only admins can write settings
+      allow write: if isAdmin();
+    }
+  }
+}
+
+// Storage rules
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Anyone can read images
+    match /events/{imageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /products/{imageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // Only admins can write to other paths
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
+
