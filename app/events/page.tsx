@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Calendar, CalendarIcon, Clock, Filter, MapPin, Search } from "lucide-react"
@@ -13,82 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-
-// This would be fetched from Firebase in a real implementation
-const events = [
-  {
-    id: "1",
-    title: "Summer Spiritual Retreat",
-    date: "June 15-18, 2025",
-    time: "All Day",
-    location: "Mountain View Retreat Center",
-    image: "/placeholder.svg?height=400&width=600",
-    category: "Retreat",
-    registrationOpen: true,
-    description:
-      "Join us for a weekend of spiritual renewal, fellowship, and growth in the beautiful mountains. Activities include worship sessions, small group discussions, hiking, and more.",
-  },
-  {
-    id: "2",
-    title: "Youth Camp Registration",
-    date: "July 10-15, 2025",
-    time: "All Day",
-    location: "Lakeside Camp Grounds",
-    image: "/placeholder.svg?height=400&width=600",
-    category: "Camp",
-    registrationOpen: true,
-    featured: true,
-    description:
-      "A life-changing week for youth ages 12-18 with activities, worship, teaching, and adventure. Build lasting friendships and grow in faith.",
-  },
-  {
-    id: "3",
-    title: "Community Service Day",
-    date: "May 8, 2025",
-    time: "9:00 AM - 3:00 PM",
-    location: "Downtown Community Center",
-    image: "/placeholder.svg?height=400&width=600",
-    category: "Service",
-    registrationOpen: true,
-    description:
-      "Serve our local community through various projects including food distribution, park cleanup, and home repairs for seniors.",
-  },
-  {
-    id: "4",
-    title: "Women's Bible Study",
-    date: "Every Tuesday",
-    time: "7:00 PM - 8:30 PM",
-    location: "Faith Community Center, Room 201",
-    image: "/placeholder.svg?height=400&width=600",
-    category: "Bible Study",
-    registrationOpen: false,
-    description: "Weekly Bible study focusing on women in Scripture and applying biblical principles to daily life.",
-  },
-  {
-    id: "5",
-    title: "Men's Breakfast Fellowship",
-    date: "First Saturday of each month",
-    time: "8:00 AM - 10:00 AM",
-    location: "Faith Community Center, Dining Hall",
-    image: "/placeholder.svg?height=400&width=600",
-    category: "Fellowship",
-    registrationOpen: false,
-    description:
-      "Monthly gathering for men to enjoy breakfast together, hear from guest speakers, and build meaningful relationships.",
-  },
-  {
-    id: "6",
-    title: "Family Camp Weekend",
-    date: "August 5-7, 2025",
-    time: "All Day",
-    location: "Pine Valley Campground",
-    image: "/placeholder.svg?height=400&width=600",
-    category: "Camp",
-    registrationOpen: true,
-    description:
-      "A weekend getaway for the whole family with activities for all ages, worship under the stars, and opportunities to connect with other families.",
-  },
-]
+import { Event, getAllEvents, getEventsByCategory } from "@/services/event-service" // Adjust the import path as needed
 
 const categories = ["All", "Retreat", "Camp", "Service", "Bible Study", "Fellowship", "Workshop"]
 
@@ -96,15 +21,36 @@ export default function EventsPage() {
   const [activeTab, setActiveTab] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [date, setDate] = useState<Date>()
-  const [filteredEvents, setFilteredEvents] = useState(events)
+  const [events, setEvents] = useState<Event[]>([]) // State for fetched events
+  const [filteredEvents, setFilteredEvents] = useState<Event[]>([])
+  const [loading, setLoading] = useState(true) // Loading state
 
-  const handleFilter = () => {
-    let filtered = events
-
-    // Filter by category
-    if (activeTab.toLowerCase() !== "all") {
-      filtered = filtered.filter((event) => event.category.toLowerCase() === activeTab.toLowerCase())
+  // Fetch events from Firebase on mount and when activeTab changes
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true)
+        let data = []
+        if (activeTab.toLowerCase() === "all") {
+          data = await getAllEvents() // Fetch all events
+        } else {
+          data = await getEventsByCategory(activeTab) // Fetch by category
+        }
+        setEvents(data)
+        setFilteredEvents(data) // Initially set filtered to all fetched data
+      } catch (error) {
+        console.error("Error fetching events:", error)
+      } finally {
+        setLoading(false)
+      }
     }
+
+    fetchEvents()
+  }, [activeTab])
+
+  // Handle filtering based on search query and date
+  const handleFilter = () => {
+    let filtered = [...events]
 
     // Filter by search query
     if (searchQuery) {
@@ -112,17 +58,25 @@ export default function EventsPage() {
         (event) =>
           event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           event.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          event.location.toLowerCase().includes(searchQuery.toLowerCase()),
+          event.location.toLowerCase().includes(searchQuery.toLowerCase())
       )
     }
 
-    // Filter by date (this is simplified - in a real app you'd need more complex date handling)
+    // Filter by date (assuming date in Firestore is stored as a string or timestamp)
     if (date) {
       const dateStr = format(date, "MMMM d, yyyy")
       filtered = filtered.filter((event) => event.date.includes(dateStr))
     }
 
     setFilteredEvents(filtered)
+  }
+
+  if (loading) {
+    return (
+      <div className="container px-4 py-12 md:py-16 text-center">
+        <p>Loading events...</p>
+      </div>
+    )
   }
 
   return (
@@ -199,7 +153,12 @@ export default function EventsPage() {
                     <Badge className="absolute top-2 right-2 bg-primary hover:bg-primary/90 z-10">Featured</Badge>
                   )}
                   <div className="overflow-hidden h-48 relative">
-                    <Image src={event.image || "/placeholder.svg"} alt={event.title} fill className="object-cover" />
+                    <Image
+                      src={event.image || "/placeholder.svg?height=400&width=600"}
+                      alt={event.title}
+                      fill
+                      className="object-cover"
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     <Badge className="absolute bottom-2 left-2 bg-black/60 hover:bg-black/70">{event.category}</Badge>
                   </div>
@@ -226,7 +185,9 @@ export default function EventsPage() {
                 </CardContent>
                 <CardFooter className="pt-0">
                   <Button className="w-full bg-primary hover:bg-primary/90" asChild>
-                    <Link href={`/events/${event.id}`}>{event.registrationOpen ? "Register Now" : "View Details"}</Link>
+                    <Link href={`/events/${event.id}`}>
+                      {event.registrationOpen ? "Register Now" : "View Details"}
+                    </Link>
                   </Button>
                 </CardFooter>
               </Card>
@@ -245,4 +206,3 @@ export default function EventsPage() {
     </div>
   )
 }
-

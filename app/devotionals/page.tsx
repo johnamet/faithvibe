@@ -9,106 +9,64 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Bookmark, Calendar, Heart, MessageSquare, Search, Share2 } from "lucide-react"
 import { motion } from "framer-motion"
 import Link from "next/link"
-
-// This would be fetched from Firebase in a real implementation
-const devotionals = [
-  {
-    id: "1",
-    title: "Finding Peace in Troubled Times",
-    verse: "John 14:27",
-    verseText:
-      "Peace I leave with you; my peace I give you. I do not give to you as the world gives. Do not let your hearts be troubled and do not be afraid.",
-    content:
-      "In a world filled with uncertainty and challenges, the promise of peace from Jesus stands as an anchor for our souls. This peace is not dependent on external circumstances but flows from a deep connection with God.",
-    author: {
-      name: "Pastor David Johnson",
-      image: "/placeholder-user.jpg",
-    },
-    date: "April 1, 2025",
-    likes: 124,
-    comments: 18,
-    category: "Peace",
-  },
-  {
-    id: "2",
-    title: "The Power of Gratitude",
-    verse: "1 Thessalonians 5:16-18",
-    verseText:
-      "Rejoice always, pray continually, give thanks in all circumstances; for this is God's will for you in Christ Jesus.",
-    content:
-      "Gratitude has the power to transform our perspective and bring joy even in difficult seasons. When we choose to focus on God's blessings rather than our challenges, we experience His presence in new ways.",
-    author: {
-      name: "Sarah Williams",
-      image: "/placeholder-user.jpg",
-    },
-    date: "March 28, 2025",
-    likes: 98,
-    comments: 12,
-    category: "Gratitude",
-  },
-  {
-    id: "3",
-    title: "Walking in Faith",
-    verse: "Hebrews 11:1",
-    verseText: "Now faith is confidence in what we hope for and assurance about what we do not see.",
-    content:
-      "Faith is the foundation of our spiritual journey. It's not just believing that God exists, but trusting Him completely with every aspect of our lives, even when the path ahead is unclear.",
-    author: {
-      name: "Pastor David Johnson",
-      image: "/placeholder-user.jpg",
-    },
-    date: "March 25, 2025",
-    likes: 156,
-    comments: 24,
-    category: "Faith",
-  },
-  {
-    id: "4",
-    title: "The Transforming Power of Love",
-    verse: "1 Corinthians 13:4-7",
-    verseText:
-      "Love is patient, love is kind. It does not envy, it does not boast, it is not proud. It does not dishonor others, it is not self-seeking, it is not easily angered, it keeps no record of wrongs.",
-    content:
-      "God's love has the power to transform our hearts and relationships. When we allow His love to flow through us, we become agents of healing and reconciliation in a broken world.",
-    author: {
-      name: "Michael Chen",
-      image: "/placeholder-user.jpg",
-    },
-    date: "March 22, 2025",
-    likes: 112,
-    comments: 16,
-    category: "Love",
-  },
-]
+import { Devotional, getAllDevotionals, getDevotionalsByCategory } from "@/services/devotional-service" // Adjust the import path as needed
 
 const categories = ["All", "Peace", "Faith", "Love", "Gratitude", "Hope", "Prayer"]
 
 export default function DevotionalsPage() {
   const [activeTab, setActiveTab] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
-  const [filteredDevotionals, setFilteredDevotionals] = useState(devotionals)
+  const [devotionals, setDevotionals] = useState<Devotional[]>([]) // State for fetched devotionals
+  const [filteredDevotionals, setFilteredDevotionals] = useState<Devotional[]>([])
+  const [loading, setLoading] = useState(true) // Loading state
 
+  // Fetch devotionals from Firebase on mount and when activeTab changes
   useEffect(() => {
-    let filtered = devotionals
-
-    // Filter by category
-    if (activeTab.toLowerCase() !== "all") {
-      filtered = filtered.filter((dev) => dev.category.toLowerCase() === activeTab.toLowerCase())
+    const fetchDevotionals = async () => {
+      try {
+        setLoading(true)
+        let data:Array<Devotional> = []
+        if (activeTab.toLowerCase() === "all") {
+          data = await getAllDevotionals() // Fetch all published devotionals
+        } else {
+          data = await getDevotionalsByCategory(activeTab) // Fetch by category
+        }
+        setDevotionals(data)
+        setFilteredDevotionals(data) // Initially set filtered to all fetched data
+      } catch (error) {
+        console.error("Error fetching devotionals:", error)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    // Filter by search query
+    fetchDevotionals()
+  }, [activeTab])
+
+  // Filter devotionals based on search query
+  useEffect(() => {
+    let filtered = [...devotionals]
+
     if (searchQuery) {
       filtered = filtered.filter(
         (dev) =>
           dev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           dev.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
           dev.verse.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          dev.author.name.toLowerCase().includes(searchQuery.toLowerCase()),
+          dev.author.name.toLowerCase().includes(searchQuery.toLowerCase())
       )
     }
 
     setFilteredDevotionals(filtered)
-  }, [activeTab, searchQuery])
+  }, [searchQuery, devotionals])
+
+  if (loading) {
+    return (
+      <div className="container px-4 py-12 md:py-16 text-center">
+        <p>Loading devotionals...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="container px-4 py-12 md:py-16">
@@ -155,7 +113,7 @@ export default function DevotionalsPage() {
                 <CardHeader className="bg-gradient-to-r from-amber-50 to-white pb-4">
                   <div className="flex items-center gap-3 mb-3">
                     <Avatar>
-                      <AvatarImage src={devotional.author.image} alt={devotional.author.name} />
+                      <AvatarImage src={devotional.author.image || "/placeholder-user.jpg"} alt={devotional.author.name} />
                       <AvatarFallback>
                         {devotional.author.name
                           .split(" ")
@@ -167,7 +125,7 @@ export default function DevotionalsPage() {
                       <p className="font-medium text-sm">{devotional.author.name}</p>
                       <div className="flex items-center text-xs text-muted-foreground">
                         <Calendar className="h-3 w-3 mr-1" />
-                        {devotional.date}
+                        {new Date(devotional.date?.toDate()).toLocaleDateString()} {/* Convert Firestore timestamp */}
                       </div>
                     </div>
                   </div>
@@ -184,12 +142,12 @@ export default function DevotionalsPage() {
                   <div className="flex gap-4">
                     <Button variant="ghost" size="sm" className="flex items-center gap-1 text-muted-foreground">
                       <Heart className="h-4 w-4" />
-                      <span>{devotional.likes}</span>
+                      <span>{devotional.likes || 0}</span>
                     </Button>
                     <Button variant="ghost" size="sm" className="flex items-center gap-1 text-muted-foreground" asChild>
                       <Link href={`/devotionals/${devotional.id}#comments`}>
                         <MessageSquare className="h-4 w-4" />
-                        <span>{devotional.comments}</span>
+                        <span>{devotional.comments || 0}</span>
                       </Link>
                     </Button>
                   </div>
@@ -218,4 +176,3 @@ export default function DevotionalsPage() {
     </div>
   )
 }
-
